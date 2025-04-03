@@ -5,6 +5,7 @@
 #include <blockindex.h>
 #include <chronik-cpp/util/hash.h>
 #include <chronik_lib/src/ffi.rs.h>
+#include <kernel/chain.h>
 #include <node/context.h>
 #include <primitives/block.h>
 #include <txmempool.h>
@@ -45,8 +46,16 @@ private:
             chronik::util::HashToArray(ptx->GetId()));
     }
 
-    void BlockConnected(const std::shared_ptr<const CBlock> &block,
+    void BlockConnected(ChainstateRole role,
+                        const std::shared_ptr<const CBlock> &block,
                         const CBlockIndex *pindex) override {
+        // Ignore events from the assumed-valid chain; we will process its
+        // blocks (sequentially) after it is fully verified by the background
+        // chainstate.
+        if (role == ChainstateRole::ASSUMEDVALID) {
+            return;
+        }
+
         // We can safely pass T& here as Rust guarantees us that no references
         // can be kept after the below function call completed.
         m_chronik->handle_block_connected(*block, *pindex);

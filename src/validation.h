@@ -23,6 +23,7 @@
 #include <deploymentstatus.h>
 #include <disconnectresult.h>
 #include <flatfile.h>
+#include <kernel/chain.h>
 #include <kernel/chainparams.h>
 #include <kernel/chainstatemanager_opts.h>
 #include <kernel/cs_main.h>
@@ -765,6 +766,12 @@ public:
         ChainstateManager &chainman,
         std::optional<BlockHash> from_snapshot_blockhash = std::nullopt);
 
+    //! Return the current role of the chainstate. See `ChainstateManager`
+    //! documentation for a description of the different types of chainstates.
+    //!
+    //! @sa ChainstateRole
+    ChainstateRole GetRole() const EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
     /**
      * Initialize the CoinsViews UTXO set database management data structures.
      * The in-memory cache is initialized separately.
@@ -1198,11 +1205,6 @@ private:
         EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     friend Chainstate;
 
-    //! Return the height of the base block of the snapshot in use, if one
-    //! exists, else nullopt.
-    std::optional<int> GetSnapshotBaseHeight() const
-        EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
-
     //! Return true if a chainstate is considered usable.
     //!
     //! This is false when a background validation chainstate has completed its
@@ -1221,6 +1223,10 @@ public:
 
     explicit ChainstateManager(Options options,
                                node::BlockManager::Options blockman_options);
+
+    //! Function to restart active indexes; set dynamically to avoid a circular
+    //! dependency on `base/index.cpp`.
+    std::function<void()> restart_indexes = std::function<void()>();
 
     const Config &GetConfig() const { return m_options.config; }
 
@@ -1587,8 +1593,7 @@ public:
 
     //! Switch the active chainstate to one based on a UTXO snapshot that was
     //! loaded previously.
-    Chainstate &ActivateExistingSnapshot(CTxMemPool *mempool,
-                                         BlockHash base_blockhash)
+    Chainstate &ActivateExistingSnapshot(BlockHash base_blockhash)
         EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
     //! If we have validated a snapshot chain during this runtime, copy its
@@ -1601,6 +1606,28 @@ public:
     //!
     //! @sa node/chainstate:LoadChainstate()
     bool ValidatedSnapshotCleanup() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
+    //! @returns the chainstate that indexes should consult when ensuring that
+    //!   an index is synced with a chain where we can expect block index
+    //!   entries to have BLOCK_HAVE_DATA beneath the tip.
+    //!
+    //!   In other words, give us the chainstate for which we can reasonably
+    //!   expect that all blocks beneath the tip have been indexed. In practice
+    //!   this means when using an assumed-valid chainstate based upon a
+    //!   snapshot, return only the fully validated chain.
+    Chainstate &GetChainstateForIndexing() EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
+    //! Return the [start, end] (inclusive) of block heights we can prune.
+    //!
+    //! start > end is possible, meaning no blocks can be pruned.
+    std::pair<int, int> GetPruneRange(const Chainstate &chainstate,
+                                      int last_height_can_prune)
+        EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
+
+    //! Return the height of the base block of the snapshot in use, if one
+    //! exists, else nullopt.
+    std::optional<int> GetSnapshotBaseHeight() const
+        EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
 
     /** Dump the recent block headers reception time to a file. */
     bool DumpRecentHeadersTime(const fs::path &filePath) const
