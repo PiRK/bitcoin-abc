@@ -213,7 +213,12 @@ public:
         checkpointData = CheckpointData(CBaseChainParams::MAIN);
 
         m_assumeutxo_data = {
-            // TODO to be specified in a future patch.
+            {.height = 888'000,
+             .hash_serialized =
+                 AssumeutxoHash{uint256S("0x50493f6218661a189654dbad816821a656b519454190c63daf376610e4fa0a7e")},
+             .nChainTx = 299'158'458,
+             .blockhash =
+                 BlockHash{uint256S("0x00000000000000002b218d995a292c34bc4c0244bb4bbdad18f3a97e88ccb567")}},
         };
 
         // Data as of block
@@ -485,6 +490,15 @@ public:
              .blockhash =
                  BlockHash{uint256S("0x47cfb2b77860d250060e78d3248bb05092876545"
                                     "3cbcbdbc121e3c48b99a376c")}},
+            {// For use by test/functional/feature_assumeutxo.py
+             .height = 299,
+             .hash_serialized =
+                 AssumeutxoHash{uint256S("0xa966794ed5a2f9debaefc7ca48dbc5d5e12"
+                                         "a89ff9fe45bd00ec5732d074580a9")},
+             .nChainTx = 334,
+             .blockhash =
+                 BlockHash{uint256S("0x118a7d5473bccce9b314789e14ce426fc65fb09d"
+                                    "feda0131032bb6d86ed2fd0b")}},
         };
 
         chainTxData = ChainTxData{0, 0, 0};
